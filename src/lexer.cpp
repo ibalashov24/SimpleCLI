@@ -14,46 +14,31 @@ Shell::Lexer::handle_line(const std::string &line)
     {
         quote_parser.update(*pos); 
 
-        if (quote_parser.is_quote()) {
-            auto quote_begin = pos;
-            // Handling quotes.
-            pos = std::find_if(pos + 1, line.end(), [](const auto &e) 
-                    {
-                        quote_parser.update(*pos);
-                        return !quote_parser.is_quote();
-                    });
-            
-            // If quote has reached the end of line, assuming 
-            // the quote is finished.
-            if (pos == line.end()) {
-                lexems.push_back(std::string(quote_begin, line.end()));
-            } else {
-                lexems.push_back(std::string(quote_begin, pos - 1));
+        pos = std::find_if_not(pos, line.end(), [](char c) { return c == ' '; }); 
+
+        std::string lexem = "";
+        bool is_found_equality = false;
+        while (pos != line.end() && (*pos != ' ' || quote_parser.is_quote())) {
+            // Handling assignment operator
+            if (!quote_parser.is_quote() && *pos == '=' && !is_found_equality) {
+                lexems.push_back(lexem);
+                lexem = "";
+
+                is_found_equality = true;
             }
 
-            ++pos;
-        } else if (*pos == ' ') {
-            ++pos;
-        } else {
-            auto lexem_begin = pos;
-            // Position of equality sign (of assignment operation).
-            auto equality_pos = line.end();
+            // Quote-part of the lexem is concatenared with 
+            // other parts (like in real Bash)
+            // Example: foo"bar"baz == foobarbaz
+            if (!quote_parser.is_delimiter()) {
+               lexem += *pos; 
+            }       
 
-            while (pos != line.end() && (*pos != ' ' || quote_parser.is_open())) {
-                if (!quote_parser.is_open() && *pos == '=') {
-                   equality_pos = pos;
-                }
-    
-                ++pos;
-            }
-    
-            if (equality_pos != line.end()) {
-                lexems.push_back(std::string(lexem_begin, equality_pos));
-                lexems.push_back("=");
-                lexems.push_back(std::string(equality_pos, pos));
-            } else {
-                lexems.push_back(std::string(lexem_begin, pos));
-            }
+            ++pos; 
+            quote_parser.update(*pos);
+        }
+        if (!lexem.empty()) {
+            lexems.push_back(lexem);
         }
     }
 
